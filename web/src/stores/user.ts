@@ -6,7 +6,9 @@ import api from '@/api'
 export interface UserCard {
   code: string
   description: string
+  type?: 'days' | 'quota'
   days: number
+  quota?: number
   expiresAt: number | null
   enabled: boolean
 }
@@ -20,7 +22,9 @@ export interface User {
 export interface Card {
   code: string
   description: string
+  type?: 'days' | 'quota'
   days: number
+  quota?: number
   enabled: boolean
   usedBy: string | null
   usedAt: number | null
@@ -140,8 +144,8 @@ export const useUserStore = defineStore('user', () => {
     return res.data
   }
 
-  async function createCard(description: string, days: number, count?: number) {
-    const res = await api.post('/api/admin/cards', { description, days, count })
+  async function createCard(description: string, days: number, count?: number, type?: 'days' | 'quota', quota?: number) {
+    const res = await api.post('/api/admin/cards', { description, days, count, type, quota })
     return res.data
   }
 

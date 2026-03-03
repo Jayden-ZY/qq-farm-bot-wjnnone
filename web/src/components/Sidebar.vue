@@ -237,6 +237,34 @@ function getDaysLabel(days: number) {
     return '永久'
   return `${days}天`
 }
+
+function getQuotaLabel(quota: number | undefined) {
+  if (quota === undefined || quota === null)
+    return '3个'
+  if (quota === -1)
+    return '不限量'
+  return `${quota}个`
+}
+
+const showRenewModal = ref(false)
+const renewCardCode = ref('')
+
+async function handleRenew() {
+  if (!renewCardCode.value) {
+    return
+  }
+  
+  try {
+    const result = await userStore.renew(renewCardCode.value)
+    if (result.ok) {
+      showRenewModal.value = false
+      renewCardCode.value = ''
+    }
+  }
+  catch (e: any) {
+    console.error('续费失败:', e)
+  }
+}
 </script>
 
 <template>
@@ -285,8 +313,8 @@ function getDaysLabel(days: number) {
                 >
                   {{ userStore.isAdmin ? '管理员' : '用户' }}
                 </span>
-                <span v-if="userStore.userCard" class="truncate text-xs text-gray-400">
-                  {{ getDaysLabel(userStore.userCard.days) }}
+                <span v-if="userStore.userCard && !userStore.isAdmin" class="truncate text-xs text-gray-400">
+                  {{ getQuotaLabel(userStore.userCard.quota) }}
                 </span>
               </div>
             </div>
@@ -309,16 +337,32 @@ function getDaysLabel(days: number) {
             <div class="text-xs text-gray-500 dark:text-gray-400">
               {{ userStore.isAdmin ? '管理员' : '普通用户' }}
             </div>
-            <div v-if="userStore.userCard" class="mt-1 text-xs">
-              <span class="text-gray-500">时长:</span>
-              <span class="ml-1" :style="{ color: 'var(--theme-primary)' }">{{ getDaysLabel(userStore.userCard.days) }}</span>
+            <div v-if="userStore.userCard && !userStore.isAdmin" class="mt-2 space-y-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">时长:</span>
+                <span :style="{ color: 'var(--theme-primary)' }">{{ getDaysLabel(userStore.userCard.days) }}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">配额:</span>
+                <span :style="{ color: 'var(--theme-primary)' }">{{ getQuotaLabel(userStore.userCard.quota) }}</span>
+              </div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-500">过期时间:</span>
+                <span :class="userStore.isExpired ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
+                  {{ userStore.expireTimeText }}
+                </span>
+              </div>
             </div>
-            <div v-if="userStore.userCard" class="text-xs">
-              <span class="text-gray-500">过期时间:</span>
-              <span class="ml-1" :class="userStore.isExpired ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'">
-                {{ userStore.expireTimeText }}
-              </span>
-            </div>
+          </div>
+          <div v-if="!userStore.isAdmin" class="border-b border-gray-100 py-1 dark:border-gray-700">
+            <button
+              class="w-full flex items-center gap-2 px-4 py-2 text-sm transition-colors hover:bg-gray-100/50 dark:hover:bg-gray-700/50"
+              :style="{ color: 'var(--theme-primary)' }"
+              @click="showRenewModal = true; showUserDropdown = false"
+            >
+              <div class="i-carbon-renew" />
+              <span>续费/加配额</span>
+            </button>
           </div>
           <div class="py-1">
             <button
@@ -520,6 +564,51 @@ function getDaysLabel(days: number) {
     @close="showRemarkModal = false"
     @saved="handleAccountSaved"
   />
+
+  <!-- 续费/加配额弹窗 -->
+  <div
+    v-if="showRenewModal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
+    @click.self="showRenewModal = false"
+  >
+    <div class="max-w-md w-full rounded-lg bg-white p-6 dark:bg-gray-800">
+      <h2 class="mb-4 text-xl text-gray-900 font-bold dark:text-white">
+        续费/加配额
+      </h2>
+      <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        输入天数卡密可续费时长，输入配额卡密可增加配额
+      </p>
+      <div class="space-y-4">
+        <div>
+          <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
+            卡密
+          </label>
+          <input
+            v-model="renewCardCode"
+            type="text"
+            class="w-full border border-gray-300 rounded-lg bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            placeholder="请输入卡密"
+          >
+        </div>
+      </div>
+      <div class="mt-6 flex justify-end space-x-3">
+        <button
+          class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          @click="showRenewModal = false"
+        >
+          取消
+        </button>
+        <button
+          class="rounded-lg px-4 py-2 text-sm text-white transition-colors"
+          :style="{ backgroundColor: 'var(--theme-primary)' }"
+          :disabled="!renewCardCode"
+          @click="handleRenew"
+        >
+          确认
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>

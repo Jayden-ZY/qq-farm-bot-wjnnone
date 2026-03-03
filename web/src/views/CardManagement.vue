@@ -16,7 +16,9 @@ const showCreateModal = ref(false)
 // 创建卡密表单
 const newCard = ref({
   description: '',
+  type: 'days' as 'days' | 'quota',
   days: 30,
+  quota: 1,
   count: 1,
 })
 
@@ -24,12 +26,20 @@ const newCard = ref({
 const selectedCards = ref<Set<string>>(new Set())
 const selectAll = ref(false)
 
+// 卡密类型切换
+const cardTypeFilter = ref<'all' | 'days' | 'quota'>('all')
+
 // 过滤和搜索
 const searchQuery = ref('')
 const filterStatus = ref<'all' | 'used' | 'unused' | 'enabled' | 'disabled'>('all')
 
 const filteredCards = computed(() => {
   let result = cards.value
+
+  // 卡密类型过滤
+  if (cardTypeFilter.value !== 'all') {
+    result = result.filter(card => (card.type || 'days') === cardTypeFilter.value)
+  }
 
   // 搜索过滤
   if (searchQuery.value) {
@@ -85,6 +95,16 @@ async function createCard() {
     return
   }
 
+  if (newCard.value.type === 'days' && newCard.value.days === undefined) {
+    toast.warning('请输入天数')
+    return
+  }
+
+  if (newCard.value.type === 'quota' && newCard.value.quota === undefined) {
+    toast.warning('请输入配额数量')
+    return
+  }
+
   const count = Math.min(Math.max(Number.parseInt(String(newCard.value.count), 10) || 1, 1), 100)
 
   try {
@@ -92,6 +112,8 @@ async function createCard() {
       newCard.value.description,
       newCard.value.days,
       count > 1 ? count : undefined,
+      newCard.value.type,
+      newCard.value.quota,
     )
     if (result.ok) {
       if (result.batch) {
@@ -103,7 +125,7 @@ async function createCard() {
         toast.success('卡密创建成功')
       }
       showCreateModal.value = false
-      newCard.value = { description: '', days: 30, count: 1 }
+      newCard.value = { description: '', type: 'days', days: 30, quota: 1, count: 1 }
       await fetchCards()
     }
     else {
@@ -258,6 +280,19 @@ function getDaysLabel(days: number) {
   return `${days}天`
 }
 
+function getQuotaLabel(quota: number) {
+  if (quota === -1)
+    return '不限量'
+  return `${quota}个`
+}
+
+function getCardTypeLabel(card: Card) {
+  if (card.type === 'quota') {
+    return `配额卡 (${getQuotaLabel(card.quota || 0)})`
+  }
+  return `天数卡 (${getDaysLabel(card.days)})`
+}
+
 // 导出卡密到文件
 function exportCardsToFile(cardsToExport: Card[], filename?: string) {
   if (!cardsToExport || cardsToExport.length === 0) {
@@ -292,13 +327,27 @@ function exportSelectedCards() {
   exportCardsToFile(selected, `卡密导出_选中_${formatDateForFile(Date.now())}.txt`)
 }
 
-// 导出所有卡密
+// 导出所有卡密（根据当前筛选类型）
 function exportAllCards() {
-  if (cards.value.length === 0) {
+  let cardsToExport: Card[]
+  let typeName: string
+  
+  if (cardTypeFilter.value === 'days') {
+    cardsToExport = cards.value.filter(card => (card.type || 'days') === 'days')
+    typeName = '时间卡密'
+  } else if (cardTypeFilter.value === 'quota') {
+    cardsToExport = cards.value.filter(card => card.type === 'quota')
+    typeName = '配额卡密'
+  } else {
+    cardsToExport = cards.value
+    typeName = '全部'
+  }
+  
+  if (cardsToExport.length === 0) {
     toast.warning('没有可导出的卡密')
     return
   }
-  exportCardsToFile(cards.value, `卡密导出_全部_${formatDateForFile(Date.now())}.txt`)
+  exportCardsToFile(cardsToExport, `卡密导出_${typeName}_${formatDateForFile(Date.now())}.txt`)
 }
 
 // 切换全选
@@ -339,12 +388,43 @@ onMounted(() => {
       </h1>
       <div class="flex gap-2">
         <BaseButton variant="secondary" @click="exportAllCards">
-          导出全部
+          {{ cardTypeFilter === 'all' ? '导出全部' : (cardTypeFilter === 'days' ? '导出时间卡密' : '导出配额卡密') }}
         </BaseButton>
         <BaseButton variant="primary" @click="showCreateModal = true">
           创建卡密
         </BaseButton>
       </div>
+    </div>
+
+    <!-- 卡密类型切换栏 -->
+    <div class="flex gap-2">
+      <button
+        class="rounded-lg px-4 py-2 font-medium transition-colors"
+        :class="cardTypeFilter === 'all'
+          ? 'bg-blue-500 text-white shadow-md'
+          : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'"
+        @click="cardTypeFilter = 'all'"
+      >
+        全部卡密
+      </button>
+      <button
+        class="rounded-lg px-4 py-2 font-medium transition-colors"
+        :class="cardTypeFilter === 'days'
+          ? 'bg-blue-500 text-white shadow-md'
+          : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'"
+        @click="cardTypeFilter = 'days'"
+      >
+        时间卡密
+      </button>
+      <button
+        class="rounded-lg px-4 py-2 font-medium transition-colors"
+        :class="cardTypeFilter === 'quota'
+          ? 'bg-purple-500 text-white shadow-md'
+          : 'bg-white text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700'"
+        @click="cardTypeFilter = 'quota'"
+      >
+        配额卡密
+      </button>
     </div>
 
     <!-- 搜索和过滤 -->
@@ -420,7 +500,7 @@ onMounted(() => {
                 描述
               </th>
               <th class="px-6 py-3 text-left text-xs text-gray-500 font-medium tracking-wider uppercase dark:text-gray-300">
-                时长
+                类型
               </th>
               <th class="px-6 py-3 text-left text-xs text-gray-500 font-medium tracking-wider uppercase dark:text-gray-300">
                 状态
@@ -461,7 +541,12 @@ onMounted(() => {
                 {{ card.description }}
               </td>
               <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                {{ getDaysLabel(card.days) }}
+                <span
+                  class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
+                  :class="card.type === 'quota' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'"
+                >
+                  {{ getCardTypeLabel(card) }}
+                </span>
               </td>
               <td class="whitespace-nowrap px-6 py-4">
                 <span
@@ -530,6 +615,22 @@ onMounted(() => {
           </div>
           <div>
             <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
+              卡密类型
+            </label>
+            <select
+              v-model="newCard.type"
+              class="w-full border border-gray-300 rounded-lg bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+            >
+              <option value="days">
+                天数卡密
+              </option>
+              <option value="quota">
+                配额卡密
+              </option>
+            </select>
+          </div>
+          <div v-if="newCard.type === 'days'">
+            <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
               天数
             </label>
             <BaseInput
@@ -539,6 +640,19 @@ onMounted(() => {
             />
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
               输入-1表示永久，其他数字表示天数
+            </p>
+          </div>
+          <div v-if="newCard.type === 'quota'">
+            <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
+              配额数量
+            </label>
+            <BaseInput
+              v-model.number="newCard.quota"
+              type="number"
+              placeholder="配额数量"
+            />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              输入-1表示不限量，其他数字表示可添加的账号数量
             </p>
           </div>
           <div>

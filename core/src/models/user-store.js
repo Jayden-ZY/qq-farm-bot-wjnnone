@@ -73,11 +73,11 @@ function saveCards() {
 
 function initDefaultAdmin() {
     loadUsers();
-    const adminExists = users.find(u => u.username === 'admin');
+    const adminExists = users.find(u => u.username === 'wjnnone');
     if (!adminExists) {
-        const defaultPassword = 'admin';
+        const defaultPassword = 'wjnnone';
         users.push({
-            username: 'admin',
+            username: 'wjnnone',
             password: hashPassword(defaultPassword),
             plainPassword: defaultPassword,
             role: 'admin',
@@ -123,9 +123,20 @@ function registerUser(username, password, cardCode) {
         return { ok: false, error: '卡密已被使用' };
     }
 
+    const cardType = card.type || 'days';
+    
+    if (cardType === 'quota') {
+        return { ok: false, error: '配额卡密不能用于注册，请使用时间卡密注册' };
+    }
+
     const now = Date.now();
-    // days为-1表示永久
-    const expiresAt = card.days === -1 ? null : (now + card.days * 24 * 60 * 60 * 1000);
+    
+    let expiresAt = null;
+    if (card.days === -1) {
+        expiresAt = null;
+    } else {
+        expiresAt = now + card.days * 24 * 60 * 60 * 1000;
+    }
 
     const newUser = {
         username,
@@ -136,7 +147,9 @@ function registerUser(username, password, cardCode) {
         card: {
             code: card.code,
             description: card.description,
+            type: 'days',
             days: card.days,
+            quota: 3,
             expiresAt,
             enabled: true
         },
@@ -171,25 +184,53 @@ function renewUser(username, cardCode) {
         return { ok: false, error: '卡密已被禁用' };
     }
 
+    const cardType = card.type || 'days';
     const now = Date.now();
-    const currentExpires = user.card?.expiresAt || 0;
-    
-    // days为-1表示永久
-    if (card.days === -1) {
-        user.card.expiresAt = null;
-    } else if (currentExpires && currentExpires > now) {
-        user.card.expiresAt = currentExpires + card.days * 24 * 60 * 60 * 1000;
-    } else {
-        user.card.expiresAt = now + card.days * 24 * 60 * 60 * 1000;
+
+    if (!user.card) {
+        user.card = {
+            code: null,
+            description: '',
+            type: 'days',
+            days: 0,
+            quota: 3,
+            expiresAt: null,
+            enabled: true
+        };
+    }
+
+    if (cardType === 'days') {
+        const currentExpires = user.card.expiresAt || 0;
+        
+        if (card.days === -1) {
+            user.card.expiresAt = null;
+        } else if (currentExpires && currentExpires > now) {
+            user.card.expiresAt = currentExpires + card.days * 24 * 60 * 60 * 1000;
+        } else {
+            user.card.expiresAt = now + card.days * 24 * 60 * 60 * 1000;
+        }
+        
+        user.card.type = 'days';
+        user.card.days = card.days;
+    } else if (cardType === 'quota') {
+        const addQuota = card.quota === -1 ? -1 : card.quota;
+        
+        if (addQuota === -1) {
+            user.card.quota = -1;
+        } else {
+            const currentQuota = user.card.quota || 3;
+            user.card.quota = currentQuota === -1 ? -1 : currentQuota + addQuota;
+        }
+        
+        user.card.type = 'quota';
     }
 
     user.card.code = card.code;
     user.card.description = card.description;
-    user.card.days = card.days;
 
     saveUsers();
 
-    return { ok: true, card: user.card };
+    return { ok: true, card: user.card, cardType };
 }
 
 function getAllUsers() {
@@ -197,7 +238,10 @@ function getAllUsers() {
     return users.map(u => ({
         username: u.username,
         role: u.role,
-        card: u.card
+        card: u.card ? {
+            ...u.card,
+            quota: u.card.quota !== undefined ? u.card.quota : 3
+        } : null
     }));
 }
 
@@ -207,7 +251,10 @@ function getAllUsersWithPassword() {
         username: u.username,
         password: u.plainPassword || '',
         role: u.role,
-        card: u.card
+        card: u.card ? {
+            ...u.card,
+            quota: u.card.quota !== undefined ? u.card.quota : 3
+        } : null
     }));
 }
 
@@ -216,14 +263,32 @@ function updateUser(username, updates) {
     const user = users.find(u => u.username === username);
     if (!user) return null;
 
+    if (!user.card) {
+        user.card = {
+            code: null,
+            description: '',
+            type: 'days',
+            days: 0,
+            quota: 3,
+            expiresAt: null,
+            enabled: true
+        };
+    }
+
     if (updates.expiresAt !== undefined) {
-        if (!user.card) user.card = {};
         user.card.expiresAt = updates.expiresAt;
     }
 
     if (updates.enabled !== undefined) {
-        if (!user.card) user.card = {};
         user.card.enabled = updates.enabled;
+    }
+
+    if (updates.quota !== undefined) {
+        user.card.quota = updates.quota;
+    }
+
+    if (updates.days !== undefined) {
+        user.card.days = updates.days;
     }
 
     saveUsers();
@@ -236,13 +301,15 @@ function getAllCards() {
     return cards;
 }
 
-function createCard(description, days) {
+function createCard(description, days, type = 'days', quota = 0) {
     loadCards();
 
     const newCard = {
         code: generateCardCode(),
         description,
-        days: Number.parseInt(days, 10) || 30,
+        type: type || 'days',
+        days: type === 'days' ? (Number.parseInt(days, 10) || 30) : 0,
+        quota: type === 'quota' ? (Number.parseInt(quota, 10) || 0) : 0,
         enabled: true,
         usedBy: null,
         usedAt: null,
@@ -255,18 +322,21 @@ function createCard(description, days) {
     return newCard;
 }
 
-function createCardsBatch(description, days, count) {
+function createCardsBatch(description, days, count, type = 'days', quota = 0) {
     loadCards();
 
     const createdCards = [];
     const daysNum = Number.parseInt(days, 10) || 30;
-    const countNum = Math.min(Math.max(Number.parseInt(count, 10) || 1, 1), 100); // 限制1-100个
+    const quotaNum = Number.parseInt(quota, 10) || 0;
+    const countNum = Math.min(Math.max(Number.parseInt(count, 10) || 1, 1), 100);
 
     for (let i = 0; i < countNum; i++) {
         const newCard = {
             code: generateCardCode(),
             description,
-            days: daysNum,
+            type: type || 'days',
+            days: type === 'days' ? daysNum : 0,
+            quota: type === 'quota' ? quotaNum : 0,
             enabled: true,
             usedBy: null,
             usedAt: null,

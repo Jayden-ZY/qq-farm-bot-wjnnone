@@ -18,9 +18,42 @@ const toast = useToastStore()
 
 const users = ref<UserWithPassword[]>([])
 const loading = ref(false)
-const showRenewModal = ref(false)
+const showEditModal = ref(false)
 const selectedUser = ref<UserWithPassword | null>(null)
-const renewCardCode = ref('')
+const editExpiresAt = ref<number | null>(null)
+const editQuota = ref<number>(3)
+const editExpiresAtInput = ref<string>('')
+
+function formatDateTimeLocal(timestamp: number | null): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function parseDateTimeLocal(str: string): number | null {
+  if (!str || !str.trim()) return null
+  const trimmed = str.trim()
+  const date = new Date(trimmed)
+  if (isNaN(date.getTime())) return null
+  return date.getTime()
+}
+
+function handleExpiresAtBlur() {
+  const parsed = parseDateTimeLocal(editExpiresAtInput.value)
+  if (parsed !== null) {
+    editExpiresAt.value = parsed
+  }
+}
+
+function handleExpiresAtInput(event: Event) {
+  const target = event.target as HTMLInputElement
+  editExpiresAtInput.value = target.value
+}
 
 async function fetchUsers() {
   loading.value = true
@@ -77,31 +110,33 @@ async function deleteUser(user: UserWithPassword) {
   }
 }
 
-function openRenewModal(user: UserWithPassword) {
+function openEditModal(user: UserWithPassword) {
   selectedUser.value = user
-  renewCardCode.value = ''
-  showRenewModal.value = true
+  editExpiresAt.value = user.card?.expiresAt || null
+  editExpiresAtInput.value = formatDateTimeLocal(user.card?.expiresAt || null)
+  editQuota.value = user.card?.quota || 3
+  showEditModal.value = true
 }
 
-async function handleRenew() {
-  if (!selectedUser.value || !renewCardCode.value) {
-    toast.warning('请输入卡密')
-    return
-  }
+async function handleEdit() {
+  if (!selectedUser.value) return
 
   try {
-    const result = await userStore.renewUser(selectedUser.value.username, renewCardCode.value)
+    const result = await userStore.updateUser(selectedUser.value.username, { 
+      expiresAt: editExpiresAt.value,
+      quota: editQuota.value 
+    })
     if (result.ok) {
-      toast.success('续费成功')
-      showRenewModal.value = false
+      toast.success('修改成功')
+      showEditModal.value = false
       await fetchUsers()
     }
     else {
-      toast.error(result.error || '续费失败')
+      toast.error(result.error || '修改失败')
     }
   }
   catch (e: any) {
-    toast.error(e.message || '续费失败')
+    toast.error(e.message || '修改失败')
   }
 }
 
@@ -135,10 +170,12 @@ function formatDate(timestamp: number | null) {
   return new Date(timestamp).toLocaleString('zh-CN')
 }
 
-function getDaysLabel(days: number) {
-  if (days === -1)
-    return '永久'
-  return `${days}天`
+function getQuotaLabel(quota: number | undefined) {
+  if (quota === undefined || quota === null)
+    return '3个'
+  if (quota === -1)
+    return '不限量'
+  return `${quota}个`
 }
 
 function isExpired(card: UserCard | null) {
@@ -179,10 +216,10 @@ onMounted(() => {
                 角色
               </th>
               <th class="px-6 py-3 text-left text-xs text-gray-500 font-medium tracking-wider uppercase dark:text-gray-300">
-                卡密类型
+                过期时间
               </th>
               <th class="px-6 py-3 text-left text-xs text-gray-500 font-medium tracking-wider uppercase dark:text-gray-300">
-                过期时间
+                配额
               </th>
               <th class="px-6 py-3 text-left text-xs text-gray-500 font-medium tracking-wider uppercase dark:text-gray-300">
                 状态
@@ -216,11 +253,16 @@ onMounted(() => {
                   {{ user.role === 'admin' ? '管理员' : '用户' }}
                 </span>
               </td>
-              <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
-                {{ user.card ? getDaysLabel(user.card.days) : '无' }}
-              </td>
               <td class="whitespace-nowrap px-6 py-4 text-sm" :class="isExpired(user.card) ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-white'">
                 {{ formatDate(user.card?.expiresAt || null) }}
+              </td>
+              <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-900 dark:text-white">
+                <span
+                  class="inline-flex rounded-full px-2 text-xs font-semibold leading-5"
+                  :class="user.card?.quota === -1 ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'"
+                >
+                  {{ getQuotaLabel(user.card?.quota) }}
+                </span>
               </td>
               <td class="whitespace-nowrap px-6 py-4">
                 <span
@@ -236,9 +278,9 @@ onMounted(() => {
                 <button
                   v-if="user.role !== 'admin'"
                   class="mr-3 text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300"
-                  @click="openRenewModal(user)"
+                  @click="openEditModal(user)"
                 >
-                  续费
+                  编辑
                 </button>
                 <button
                   v-if="user.role !== 'admin' && user.card"
@@ -266,15 +308,15 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 续费弹窗 -->
+    <!-- 编辑弹窗 -->
     <div
-      v-if="showRenewModal"
+      v-if="showEditModal"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"
-      @click.self="showRenewModal = false"
+      @click.self="showEditModal = false"
     >
       <div class="max-w-md w-full rounded-lg bg-white p-6 dark:bg-gray-800">
         <h2 class="mb-4 text-xl text-gray-900 font-bold dark:text-white">
-          为用户续费
+          编辑用户
         </h2>
         <p class="mb-4 text-sm text-gray-600 dark:text-gray-400">
           用户：{{ selectedUser?.username }}
@@ -282,20 +324,39 @@ onMounted(() => {
         <div class="space-y-4">
           <div>
             <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
-              卡密
+              过期时间
+            </label>
+            <input
+              :value="editExpiresAtInput"
+              type="datetime-local"
+              class="w-full border border-gray-300 rounded-lg bg-white px-3 py-2 text-gray-900 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+              @input="handleExpiresAtInput"
+              @blur="handleExpiresAtBlur"
+            >
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              清空表示永久有效
+            </p>
+          </div>
+          <div>
+            <label class="mb-1 block text-sm text-gray-700 font-medium dark:text-gray-300">
+              配额
             </label>
             <BaseInput
-              v-model="renewCardCode"
-              placeholder="请输入卡密"
+              v-model.number="editQuota"
+              type="number"
+              placeholder="配额"
             />
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              输入-1表示不限量，其他数字表示可添加的账号数量
+            </p>
           </div>
         </div>
         <div class="mt-6 flex justify-end space-x-3">
-          <BaseButton variant="secondary" @click="showRenewModal = false">
+          <BaseButton variant="secondary" @click="showEditModal = false">
             取消
           </BaseButton>
-          <BaseButton variant="primary" @click="handleRenew">
-            续费
+          <BaseButton variant="primary" @click="handleEdit">
+            修改
           </BaseButton>
         </div>
       </div>

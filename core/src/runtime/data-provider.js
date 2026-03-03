@@ -129,6 +129,9 @@ function createDataProvider(options) {
                 preferredSeedId,
                 intervals: body.intervals,
                 friendQuietHours: body.friendQuietHours,
+                stealDelaySeconds: body.stealDelaySeconds,
+                plantOrderRandom: body.plantOrderRandom,
+                plantDelaySeconds: body.plantDelaySeconds,
             };
             store.applyConfigSnapshot(snapshot, { accountId });
             const rev = nextConfigRevision();
@@ -138,6 +141,9 @@ function createDataProvider(options) {
                 preferredSeed: store.getPreferredSeed(accountId),
                 intervals: store.getIntervals(accountId),
                 friendQuietHours: store.getFriendQuietHours(accountId),
+                stealDelaySeconds: store.getStealDelaySeconds(accountId),
+                plantOrderRandom: store.getPlantOrderRandom(accountId),
+                plantDelaySeconds: store.getPlantDelaySeconds(accountId),
                 configRevision: rev,
             };
         },

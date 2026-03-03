@@ -304,7 +304,8 @@ function startAdminServer(dataProvider) {
             }
         }
 
-        res.json({ ok: true, data: result.card });
+        const message = result.cardType === 'days' ? '续费成功' : '配额增加成功';
+        res.json({ ok: true, data: result.card, cardType: result.cardType, message });
     });
 
     // 修改密码接口
@@ -1043,18 +1044,26 @@ function startAdminServer(dataProvider) {
     // 创建卡密
     app.post('/api/admin/cards', authRequired, adminRequired, (req, res) => {
         try {
-            const { description, days, count } = req.body || {};
-            if (!description || days === undefined) {
-                return res.status(400).json({ ok: false, error: '请提供描述和天数' });
+            const { description, days, count, type, quota } = req.body || {};
+            if (!description) {
+                return res.status(400).json({ ok: false, error: '请提供描述' });
+            }
+            
+            const cardType = type || 'days';
+            if (cardType === 'days' && days === undefined) {
+                return res.status(400).json({ ok: false, error: '天数卡密请提供天数' });
+            }
+            if (cardType === 'quota' && quota === undefined) {
+                return res.status(400).json({ ok: false, error: '配额卡密请提供配额数量' });
             }
             
             // 批量创建
             if (count && Number.parseInt(count, 10) > 1) {
-                const cards = userStore.createCardsBatch(description, days, count);
+                const cards = userStore.createCardsBatch(description, days, count, cardType, quota);
                 return res.json({ ok: true, data: cards, batch: true, count: cards.length });
             }
             
-            const card = userStore.createCard(description, days);
+            const card = userStore.createCard(description, days, cardType, quota);
             res.json({ ok: true, data: card });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
@@ -1191,7 +1200,8 @@ function startAdminServer(dataProvider) {
                 }
             }
 
-            res.json({ ok: true, data: result.card });
+            const message = result.cardType === 'days' ? '续费成功' : '配额增加成功';
+            res.json({ ok: true, data: result.card, cardType: result.cardType, message });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }
@@ -1347,8 +1357,17 @@ function startAdminServer(dataProvider) {
                 }
             }
 
-            // 如果是新增账号，自动关联当前用户
+            // 如果是新增账号，检查配额限制并设置用户关联
             if (!isUpdate && currentUser) {
+                if (currentUser.role !== 'admin') {
+                    const userQuota = currentUser.card?.quota;
+                    if (userQuota !== undefined && userQuota !== null && userQuota !== -1) {
+                        const currentAccounts = getAccountList(currentUser.username);
+                        if (currentAccounts.length >= userQuota) {
+                            return res.status(403).json({ ok: false, error: `账号数量已达上限（${userQuota}个），请购买配额卡密增加配额` });
+                        }
+                    }
+                }
                 payload.username = currentUser.username;
             }
 
