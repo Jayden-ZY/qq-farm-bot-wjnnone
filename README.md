@@ -113,7 +113,18 @@ ADMIN_PASSWORD='你的强密码' pnpm dev:core
 ---
 
 ## Docker 部署
-- 目前不支持（本人不太懂docker）
+
+```bash
+# 构建并后台启动
+docker compose up -d --build
+
+# 查看日志
+docker compose logs -f
+
+# 停止并移除容器
+docker compose down
+```
+
 ## 二进制发布版（无需 Node.js）
 
 ### 构建
