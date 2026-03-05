@@ -1,8 +1,8 @@
 # QQ 农场多账号挂机 + Web 面板
 
-现在qq扫码用不了，自行寻找方法获取code
 基于 Node.js 的 QQ 农场自动化工具，支持多账号管理、Web 控制面板、实时日志与数据分析。
-基于[Penty-d/qq-farm-bot-ui](https://github.com/Penty-d/qq-farm-bot-ui)项目二开
+基于[Penty-d/qq-farm-bot-ui](https://github.com/Penty-d/qq-farm-bot-ui)项目二开。
+现在qq扫码用不了，自行寻找方法获取code
 
 ## 技术栈
 
