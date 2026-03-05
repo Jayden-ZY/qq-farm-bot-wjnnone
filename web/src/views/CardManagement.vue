@@ -331,18 +331,20 @@ function exportSelectedCards() {
 function exportAllCards() {
   let cardsToExport: Card[]
   let typeName: string
-  
+
   if (cardTypeFilter.value === 'days') {
     cardsToExport = cards.value.filter(card => (card.type || 'days') === 'days')
     typeName = '时间卡密'
-  } else if (cardTypeFilter.value === 'quota') {
+  }
+  else if (cardTypeFilter.value === 'quota') {
     cardsToExport = cards.value.filter(card => card.type === 'quota')
     typeName = '配额卡密'
-  } else {
+  }
+  else {
     cardsToExport = cards.value
     typeName = '全部'
   }
-  
+
   if (cardsToExport.length === 0) {
     toast.warning('没有可导出的卡密')
     return

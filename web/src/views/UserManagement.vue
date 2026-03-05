@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { UserCard } from '@/stores/user'
 import { onMounted, ref } from 'vue'
+import api from '@/api'
 import BaseButton from '@/components/ui/BaseButton.vue'
 import BaseInput from '@/components/ui/BaseInput.vue'
+import BaseSwitch from '@/components/ui/BaseSwitch.vue'
 import { useToastStore } from '@/stores/toast'
 import { useUserStore } from '@/stores/user'
 
@@ -24,8 +26,26 @@ const editExpiresAt = ref<number | null>(null)
 const editQuota = ref<number>(3)
 const editExpiresAtInput = ref<string>('')
 
+const oauthConfig = ref({
+  enabled: false,
+  apiUrl: '',
+  appId: '',
+  appKey: '',
+})
+const oauthSaving = ref(false)
+const oauthExpanded = ref(false)
+
+const oauthUserDefault = ref({
+  days: 30,
+  quota: 0,
+})
+const cardRegisterDefault = ref({
+  quota: 3,
+})
+
 function formatDateTimeLocal(timestamp: number | null): string {
-  if (!timestamp) return ''
+  if (!timestamp)
+    return ''
   const date = new Date(timestamp)
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -36,10 +56,12 @@ function formatDateTimeLocal(timestamp: number | null): string {
 }
 
 function parseDateTimeLocal(str: string): number | null {
-  if (!str || !str.trim()) return null
+  if (!str || !str.trim())
+    return null
   const trimmed = str.trim()
   const date = new Date(trimmed)
-  if (isNaN(date.getTime())) return null
+  if (isNaN(date.getTime()))
+    return null
   return date.getTime()
 }
 
@@ -119,12 +141,13 @@ function openEditModal(user: UserWithPassword) {
 }
 
 async function handleEdit() {
-  if (!selectedUser.value) return
+  if (!selectedUser.value)
+    return
 
   try {
-    const result = await userStore.updateUser(selectedUser.value.username, { 
+    const result = await userStore.updateUser(selectedUser.value.username, {
       expiresAt: editExpiresAt.value,
-      quota: editQuota.value 
+      quota: editQuota.value,
     })
     if (result.ok) {
       toast.success('修改成功')
@@ -186,7 +209,95 @@ function isExpired(card: UserCard | null) {
 
 onMounted(() => {
   fetchUsers()
+  loadOAuthConfig()
+  loadOAuthUserDefault()
+  loadCardRegisterDefault()
 })
+
+async function loadOAuthConfig() {
+  try {
+    const res = await api.get('/api/admin/oauth')
+    if (res.data.ok) {
+      oauthConfig.value = res.data.data
+    }
+  }
+  catch {
+    // ignore
+  }
+}
+
+async function loadOAuthUserDefault() {
+  try {
+    const res = await api.get('/api/admin/oauth-user-default')
+    if (res.data.ok) {
+      oauthUserDefault.value = res.data.data
+    }
+  }
+  catch {
+    // ignore
+  }
+}
+
+async function loadCardRegisterDefault() {
+  try {
+    const res = await api.get('/api/admin/card-register-default')
+    if (res.data.ok) {
+      cardRegisterDefault.value = res.data.data
+    }
+  }
+  catch {
+    // ignore
+  }
+}
+
+async function handleSaveOAuth() {
+  oauthSaving.value = true
+  try {
+    const res = await api.post('/api/admin/oauth', oauthConfig.value)
+    if (res.data.ok) {
+      toast.success('OAuth配置已保存')
+    }
+    else {
+      toast.error(res.data.error || '保存失败')
+    }
+  }
+  catch (e: any) {
+    toast.error(e.message || '保存失败')
+  }
+  finally {
+    oauthSaving.value = false
+  }
+}
+
+async function handleSaveOAuthUserDefault() {
+  try {
+    const res = await api.post('/api/admin/oauth-user-default', oauthUserDefault.value)
+    if (res.data.ok) {
+      toast.success('QQ登录用户默认配置已保存')
+    }
+    else {
+      toast.error(res.data.error || '保存失败')
+    }
+  }
+  catch (e: any) {
+    toast.error(e.message || '保存失败')
+  }
+}
+
+async function handleSaveCardRegisterDefault() {
+  try {
+    const res = await api.post('/api/admin/card-register-default', cardRegisterDefault.value)
+    if (res.data.ok) {
+      toast.success('卡密注册默认配置已保存')
+    }
+    else {
+      toast.error(res.data.error || '保存失败')
+    }
+  }
+  catch (e: any) {
+    toast.error(e.message || '保存失败')
+  }
+}
 </script>
 
 <template>
@@ -198,6 +309,126 @@ onMounted(() => {
       <BaseButton variant="primary" @click="fetchUsers">
         刷新
       </BaseButton>
+    </div>
+
+    <!-- QQ聚合登录配置 -->
+    <div class="rounded-lg bg-white shadow dark:bg-gray-800">
+      <div
+        class="cursor-pointer border-b border-gray-200 bg-gray-50 px-6 py-4 dark:border-gray-700 dark:bg-gray-800/50"
+        @click="oauthExpanded = !oauthExpanded"
+      >
+        <h3 class="flex items-center justify-between text-lg text-gray-900 font-bold dark:text-gray-100">
+          <div class="flex items-center gap-2">
+            <div class="i-fas-plug" />
+            QQ聚合登录配置
+          </div>
+          <div
+            class="i-fas-chevron-down transition-transform duration-200"
+            :class="oauthExpanded ? 'rotate-180' : ''"
+          />
+        </h3>
+      </div>
+      <div v-show="oauthExpanded" class="p-6">
+        <div class="grid grid-cols-1 gap-4 lg:grid-cols-4 md:grid-cols-2">
+          <div class="flex items-center">
+            <BaseSwitch
+              v-model="oauthConfig.enabled"
+              label="启用QQ登录"
+            />
+          </div>
+          <BaseInput
+            v-model="oauthConfig.apiUrl"
+            label="接口地址"
+            type="text"
+            placeholder="如 https://api.clogin.cc/"
+          />
+          <BaseInput
+            v-model="oauthConfig.appId"
+            label="App ID"
+            type="text"
+            placeholder="应用ID"
+          />
+          <BaseInput
+            v-model="oauthConfig.appKey"
+            label="App Key"
+            type="password"
+            placeholder="应用密钥"
+          />
+        </div>
+        <div class="mt-3 flex items-center justify-between">
+          <p class="text-xs text-gray-500 dark:text-gray-400">
+            接口地址需要以 / 结尾，请前往 <a href="https://www.clogin.cc/" target="_blank" class="text-blue-500 hover:underline">clogin.cc</a> 获取配置
+          </p>
+          <BaseButton
+            variant="primary"
+            size="sm"
+            :loading="oauthSaving"
+            @click="handleSaveOAuth"
+          >
+            保存配置
+          </BaseButton>
+        </div>
+
+        <!-- QQ登录用户默认配置 -->
+        <div class="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
+          <h4 class="mb-4 text-base text-gray-800 font-semibold dark:text-gray-200">
+            QQ登录用户默认配置
+          </h4>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BaseInput
+              v-model.number="oauthUserDefault.days"
+              label="默认天数"
+              type="number"
+              placeholder="30"
+            />
+            <BaseInput
+              v-model.number="oauthUserDefault.quota"
+              label="默认配额"
+              type="number"
+              placeholder="0"
+            />
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            天数设为0表示永久有效，配额设为0表示不限制账号数量
+          </p>
+          <div class="mt-3 flex justify-end">
+            <BaseButton
+              variant="primary"
+              size="sm"
+              @click="handleSaveOAuthUserDefault"
+            >
+              保存QQ登录默认配置
+            </BaseButton>
+          </div>
+        </div>
+
+        <!-- 卡密注册默认配置 -->
+        <div class="mt-6 border-t border-gray-200 pt-6 dark:border-gray-700">
+          <h4 class="mb-4 text-base text-gray-800 font-semibold dark:text-gray-200">
+            时间卡密注册默认配置
+          </h4>
+          <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BaseInput
+              v-model.number="cardRegisterDefault.quota"
+              label="默认配额"
+              type="number"
+              placeholder="3"
+            />
+          </div>
+          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+            使用时间卡密注册时，新用户的默认账号配额数量
+          </p>
+          <div class="mt-3 flex justify-end">
+            <BaseButton
+              variant="primary"
+              size="sm"
+              @click="handleSaveCardRegisterDefault"
+            >
+              保存卡密注册默认配置
+            </BaseButton>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 用户列表 -->

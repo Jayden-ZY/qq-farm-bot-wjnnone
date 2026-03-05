@@ -32,6 +32,8 @@ const userState = {
     gold: 0,
     exp: 0,
     coupon: 0, // 点券(ID:1002)
+    openId: '',
+    accountId: '',
 };
 
 function getUserState() { return userState; }
@@ -365,6 +367,7 @@ function sendLogin(onLoginSuccess) {
                 userState.level = toNum(reply.basic.level);
                 userState.gold = toNum(reply.basic.gold);
                 userState.exp = toNum(reply.basic.exp);
+                userState.openId = reply.basic.open_id || '';
 
                 // 更新状态栏
                 updateStatusFromLogin({

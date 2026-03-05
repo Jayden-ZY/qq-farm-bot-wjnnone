@@ -752,12 +752,6 @@ function syncStatus() {
 
     const limits = require('../services/friend').getOperationLimits();
     const fullStats = require('../services/stats').getStats(statusData, userState, connected, limits);
-    const nowMs = Date.now();
-    fullStats.nextChecks = {
-        farmRemainSec: Math.max(0, Math.ceil((Number(nextFarmRunAt || 0) - nowMs) / 1000)),
-        helpRemainSec: Math.max(0, Math.ceil((Number(nextHelpRunAt || 0) - nowMs) / 1000)),
-        stealRemainSec: Math.max(0, Math.ceil((Number(nextStealRunAt || 0) - nowMs) / 1000)),
-    };
 
     fullStats.automation = getAutomation();
     fullStats.preferredSeed = getPreferredSeed();

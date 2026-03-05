@@ -19,8 +19,10 @@ const imageErrors = ref<Record<string | number, boolean>>({})
 const actionLoading = ref<Record<string | number, boolean>>({})
 
 function getSafeImageUrl(url: string | undefined) {
-  if (!url) return ''
-  if (url.startsWith('http://')) return url.replace('http://', 'https://')
+  if (!url)
+    return ''
+  if (url.startsWith('http://'))
+    return url.replace('http://', 'https://')
   return url
 }
 
@@ -34,34 +36,51 @@ const selectedIds = ref<Set<number>>(new Set())
 const sellSubmitting = ref(false)
 
 const USABLE_INTERACTION_TYPES = new Set([
-  'fertilizer', 'fertilizerpro', 'gift', 'giftbox', 'box', 'chest',
+  'fertilizer',
+  'fertilizerpro',
+  'gift',
+  'giftbox',
+  'box',
+  'chest',
 ])
 
 function canUseItem(item: any): boolean {
-  if (!item) return false
+  if (!item)
+    return false
   const id = Number(item.id)
-  if (id === 1011 || id === 1012) return false
+  if (id === 1011 || id === 1012)
+    return false
   const it = String(item.interactionType || '').toLowerCase()
-  if (USABLE_INTERACTION_TYPES.has(it)) return true
-  if (it === 'fertilizerbucket') return false
-  if (item.category === 'gold' || item.category === 'exp') return false
-  if (item.category === 'fruit' || item.category === 'seed') return false
-  if (it && it !== 'none' && it !== '') return true
+  if (USABLE_INTERACTION_TYPES.has(it))
+    return true
+  if (it === 'fertilizerbucket')
+    return false
+  if (item.category === 'gold' || item.category === 'exp')
+    return false
+  if (item.category === 'fruit' || item.category === 'seed')
+    return false
+  if (it && it !== 'none' && it !== '')
+    return true
   return false
 }
 
 function canSellItem(item: any): boolean {
-  if (!item) return false
-  if (item.category === 'gold' || item.category === 'exp') return false
-  if (item.category === 'fruit' || item.category === 'seed') return true
-  if (Number(item.price) > 0) return true
+  if (!item)
+    return false
+  if (item.category === 'gold' || item.category === 'exp')
+    return false
+  if (item.category === 'fruit' || item.category === 'seed')
+    return true
+  if (Number(item.price) > 0)
+    return true
   return false
 }
 
 const sellableItems = computed(() => items.value.filter(canSellItem))
 
 const allSellableSelected = computed(() => {
-  if (sellableItems.value.length === 0) return false
+  if (sellableItems.value.length === 0)
+    return false
   return sellableItems.value.every(it => selectedIds.value.has(Number(it.id)))
 })
 
@@ -107,7 +126,8 @@ function closeUseModal() {
 }
 
 async function confirmUse() {
-  if (!useTarget.value || !currentAccountId.value) return
+  if (!useTarget.value || !currentAccountId.value)
+    return
   const itemId = Number(useTarget.value.id)
   const count = Math.max(1, Math.min(useCount.value, useTarget.value.count || 1))
   useSubmitting.value = true
@@ -141,7 +161,8 @@ function exitSellMode() {
 }
 
 async function confirmSell() {
-  if (selectedItems.value.length === 0 || !currentAccountId.value) return
+  if (selectedItems.value.length === 0 || !currentAccountId.value)
+    return
   sellSubmitting.value = true
   try {
     // 使用 originalItems 获取原始物品数据（包含正确的 uid）
@@ -212,7 +233,7 @@ useIntervalFn(loadBag, 60000)
         </span>
         <button
           v-if="!sellMode && sellableItems.length > 0 && status?.connection?.connected"
-          class="rounded-lg border border-orange-200 bg-orange-50 px-2.5 py-1 text-xs text-orange-600 font-medium transition hover:bg-orange-100 dark:border-orange-700/50 dark:bg-orange-900/20 dark:text-orange-400 dark:hover:bg-orange-900/30"
+          class="border border-orange-200 rounded-lg bg-orange-50 px-2.5 py-1 text-xs text-orange-600 font-medium transition dark:border-orange-700/50 dark:bg-orange-900/20 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30"
           @click="enterSellMode"
         >
           <div class="i-carbon-shopping-cart mr-0.5 inline-block align-text-bottom text-sm" />
@@ -220,7 +241,7 @@ useIntervalFn(loadBag, 60000)
         </button>
         <button
           v-if="sellMode"
-          class="rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs text-gray-600 font-medium transition hover:bg-gray-100 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          class="border border-gray-200 rounded-lg bg-gray-50 px-2.5 py-1 text-xs text-gray-600 font-medium transition dark:border-gray-600 dark:bg-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
           @click="exitSellMode"
         >
           取消
@@ -237,15 +258,23 @@ useIntervalFn(loadBag, 60000)
     </div>
 
     <div v-else-if="statusError" class="border border-red-200 rounded-lg bg-red-50 p-8 text-center text-red-500 shadow dark:border-red-800 dark:bg-red-900/20">
-      <div class="mb-2 text-lg font-bold">获取数据失败</div>
-      <div class="text-sm">{{ statusError }}</div>
+      <div class="mb-2 text-lg font-bold">
+        获取数据失败
+      </div>
+      <div class="text-sm">
+        {{ statusError }}
+      </div>
     </div>
 
     <div v-else-if="!status?.connection?.connected" class="flex flex-col items-center justify-center gap-4 rounded-lg bg-white p-12 text-center text-gray-500 shadow dark:bg-gray-800">
       <div class="i-carbon-connection-signal-off text-4xl text-gray-400" />
       <div>
-        <div class="text-lg text-gray-700 font-medium dark:text-gray-300">账号未登录</div>
-        <div class="mt-1 text-sm text-gray-400">请先运行账号或检查网络连接</div>
+        <div class="text-lg text-gray-700 font-medium dark:text-gray-300">
+          账号未登录
+        </div>
+        <div class="mt-1 text-sm text-gray-400">
+          请先运行账号或检查网络连接
+        </div>
       </div>
     </div>
 
@@ -254,11 +283,11 @@ useIntervalFn(loadBag, 60000)
     </div>
 
     <template v-else>
-      <div v-if="sellMode" class="flex items-center justify-between rounded-lg border border-orange-200 bg-orange-50/80 px-3 py-2 dark:border-orange-800/40 dark:bg-orange-900/10">
+      <div v-if="sellMode" class="flex items-center justify-between border border-orange-200 rounded-lg bg-orange-50/80 px-3 py-2 dark:border-orange-800/40 dark:bg-orange-900/10">
         <label class="flex cursor-pointer items-center gap-2 text-sm">
           <input
             type="checkbox"
-            class="h-4 w-4 accent-orange-500 rounded"
+            class="h-4 w-4 rounded accent-orange-500"
             :checked="allSellableSelected"
             @change="toggleSelectAll"
           >
@@ -281,7 +310,7 @@ useIntervalFn(loadBag, 60000)
         <div
           v-for="item in items"
           :key="item.id"
-          class="group flex min-w-0 shrink-0 items-center gap-2.5 rounded-lg border bg-white p-2 transition sm:gap-3 sm:p-2.5"
+          class="group min-w-0 flex shrink-0 items-center gap-2.5 border rounded-lg bg-white p-2 transition sm:gap-3 sm:p-2.5"
           :class="[
             sellMode && selectedIds.has(Number(item.id))
               ? 'border-orange-300 bg-orange-50/50 dark:border-orange-700/60 dark:bg-orange-900/10'
@@ -292,7 +321,7 @@ useIntervalFn(loadBag, 60000)
             <input
               v-if="canSellItem(item)"
               type="checkbox"
-              class="h-4 w-4 accent-orange-500 rounded cursor-pointer"
+              class="h-4 w-4 cursor-pointer rounded accent-orange-500"
               :checked="selectedIds.has(Number(item.id))"
               @change="toggleSelect(Number(item.id))"
             >
@@ -300,7 +329,7 @@ useIntervalFn(loadBag, 60000)
           </div>
 
           <div
-            class="thumb-wrap h-9 w-9 shrink-0 flex items-center justify-center overflow-hidden rounded-lg bg-gray-50 dark:bg-gray-700/50 sm:h-10 sm:w-10"
+            class="thumb-wrap h-9 w-9 flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-gray-50 sm:h-10 sm:w-10 dark:bg-gray-700/50"
             :data-fallback="(item.name || '物').slice(0, 1)"
           >
             <img
@@ -311,14 +340,14 @@ useIntervalFn(loadBag, 60000)
               decoding="async"
               @error="imageErrors[item.id] = true"
             >
-            <div v-else class="text-base font-bold uppercase text-gray-400 sm:text-lg">
+            <div v-else class="text-base text-gray-400 font-bold uppercase sm:text-lg">
               {{ (item.name || '物').slice(0, 1) }}
             </div>
           </div>
 
           <div class="min-w-0 flex-1 overflow-hidden">
             <div class="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-              <span class="truncate text-sm font-medium text-gray-800 dark:text-gray-200" :title="item.name">
+              <span class="truncate text-sm text-gray-800 font-medium dark:text-gray-200" :title="item.name">
                 {{ item.name || `物品${item.id}` }}
               </span>
               <span
@@ -346,7 +375,7 @@ useIntervalFn(loadBag, 60000)
           <div v-if="!sellMode" class="flex shrink-0 items-center gap-1">
             <button
               v-if="canUseItem(item)"
-              class="rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs text-blue-600 font-medium transition hover:bg-blue-100 dark:border-blue-700/50 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
+              class="border border-blue-200 rounded-md bg-blue-50 px-2 py-0.5 text-xs text-blue-600 font-medium transition dark:border-blue-700/50 dark:bg-blue-900/20 hover:bg-blue-100 dark:text-blue-400 dark:hover:bg-blue-900/30"
               :disabled="!!actionLoading[item.id]"
               @click="openUseModal(item)"
             >
@@ -358,7 +387,7 @@ useIntervalFn(loadBag, 60000)
 
       <div
         v-if="sellMode && selectedIds.size > 0"
-        class="sticky bottom-0 flex items-center justify-between gap-3 rounded-lg border border-orange-200 bg-white px-4 py-3 shadow-lg dark:border-orange-800/40 dark:bg-gray-800"
+        class="sticky bottom-0 flex items-center justify-between gap-3 border border-orange-200 rounded-lg bg-white px-4 py-3 shadow-lg dark:border-orange-800/40 dark:bg-gray-800"
       >
         <div class="text-sm">
           <span class="text-gray-600 dark:text-gray-400">
@@ -371,7 +400,7 @@ useIntervalFn(loadBag, 60000)
           </span>
         </div>
         <button
-          class="rounded-lg bg-orange-500 px-4 py-1.5 text-sm text-white font-medium shadow transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+          class="rounded-lg bg-orange-500 px-4 py-1.5 text-sm text-white font-medium shadow transition disabled:cursor-not-allowed hover:bg-orange-600 disabled:opacity-50"
           :disabled="sellSubmitting"
           @click="confirmSell"
         >
@@ -384,11 +413,11 @@ useIntervalFn(loadBag, 60000)
     <Teleport to="body">
       <div v-if="useModal && useTarget" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" @click.self="closeUseModal">
         <div class="w-80 rounded-xl bg-white p-5 shadow-2xl dark:bg-gray-800" @click.stop>
-          <h3 class="mb-4 text-lg font-bold text-gray-800 dark:text-gray-200">
+          <h3 class="mb-4 text-lg text-gray-800 font-bold dark:text-gray-200">
             使用物品
           </h3>
           <div class="mb-4 flex items-center gap-3 rounded-lg bg-gray-50 p-3 dark:bg-gray-700/50">
-            <div class="h-10 w-10 shrink-0 flex items-center justify-center overflow-hidden rounded-lg bg-white dark:bg-gray-600">
+            <div class="h-10 w-10 flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white dark:bg-gray-600">
               <img
                 v-if="useTarget.image && !imageErrors[`use-${useTarget.id}`]"
                 :src="getSafeImageUrl(useTarget.image)"
@@ -396,13 +425,17 @@ useIntervalFn(loadBag, 60000)
                 decoding="async"
                 @error="imageErrors[`use-${useTarget.id}`] = true"
               >
-              <div v-else class="text-lg font-bold text-gray-400">
+              <div v-else class="text-lg text-gray-400 font-bold">
                 {{ (useTarget.name || '物').slice(0, 1) }}
               </div>
             </div>
             <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium">{{ useTarget.name }}</div>
-              <div class="text-xs text-gray-500">拥有 {{ useTarget.count }} 个</div>
+              <div class="truncate text-sm font-medium">
+                {{ useTarget.name }}
+              </div>
+              <div class="text-xs text-gray-500">
+                拥有 {{ useTarget.count }} 个
+              </div>
             </div>
           </div>
 
@@ -410,7 +443,7 @@ useIntervalFn(loadBag, 60000)
             <label class="mb-1.5 block text-sm text-gray-600 dark:text-gray-400">使用数量</label>
             <div class="flex items-center gap-2">
               <button
-                class="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 text-lg transition hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                class="h-8 w-8 flex items-center justify-center border border-gray-200 rounded-lg text-lg transition dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :disabled="useCount <= 1"
                 @click="useCount = Math.max(1, useCount - 1)"
               >
@@ -421,18 +454,18 @@ useIntervalFn(loadBag, 60000)
                 type="number"
                 :min="1"
                 :max="useTarget.count || 1"
-                class="h-8 w-16 rounded-lg border border-gray-200 bg-white text-center text-sm font-medium dark:border-gray-600 dark:bg-gray-700"
+                class="h-8 w-16 border border-gray-200 rounded-lg bg-white text-center text-sm font-medium dark:border-gray-600 dark:bg-gray-700"
                 @input="useCount = Math.max(1, Math.min(useCount, useTarget.count || 1))"
               >
               <button
-                class="h-8 w-8 flex items-center justify-center rounded-lg border border-gray-200 text-lg transition hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                class="h-8 w-8 flex items-center justify-center border border-gray-200 rounded-lg text-lg transition dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                 :disabled="useCount >= (useTarget.count || 1)"
                 @click="useCount = Math.min(useTarget.count || 1, useCount + 1)"
               >
                 +
               </button>
               <button
-                class="rounded-lg border border-gray-200 px-2 py-1 text-xs text-gray-500 transition hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700"
+                class="border border-gray-200 rounded-lg px-2 py-1 text-xs text-gray-500 transition dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
                 @click="useCount = useTarget.count || 1"
               >
                 全部
@@ -442,13 +475,13 @@ useIntervalFn(loadBag, 60000)
 
           <div class="flex justify-end gap-2">
             <button
-              class="rounded-lg border border-gray-200 px-4 py-1.5 text-sm text-gray-600 transition hover:bg-gray-100 dark:border-gray-600 dark:text-gray-400 dark:hover:bg-gray-700"
+              class="border border-gray-200 rounded-lg px-4 py-1.5 text-sm text-gray-600 transition dark:border-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700"
               @click="closeUseModal"
             >
               取消
             </button>
             <button
-              class="rounded-lg bg-blue-500 px-4 py-1.5 text-sm text-white font-medium shadow transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-lg bg-blue-500 px-4 py-1.5 text-sm text-white font-medium shadow transition disabled:cursor-not-allowed hover:bg-blue-600 disabled:opacity-50"
               :disabled="useSubmitting || useCount < 1"
               @click="confirmUse"
             >
@@ -463,7 +496,9 @@ useIntervalFn(loadBag, 60000)
 </template>
 
 <style scoped>
-.thumb-wrap.fallback img { display: none; }
+.thumb-wrap.fallback img {
+  display: none;
+}
 .thumb-wrap.fallback::after {
   content: attr(data-fallback);
   font-size: 1.5rem;
@@ -471,12 +506,12 @@ useIntervalFn(loadBag, 60000)
   color: #9ca3af;
   text-transform: uppercase;
 }
-input[type="number"]::-webkit-inner-spin-button,
-input[type="number"]::-webkit-outer-spin-button {
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
   -webkit-appearance: none;
   margin: 0;
 }
-input[type="number"] {
+input[type='number'] {
   -moz-appearance: textfield;
 }
 </style>

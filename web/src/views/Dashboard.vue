@@ -187,48 +187,16 @@ function formatBucketTime(item: any) {
   return `${(count / 3600).toFixed(1)}h`
 }
 
-// Next Check Countdown
-const nextFarmCheck = ref('--:--:--')
-const nextFriendCheck = ref('--:--:--')
+// Uptime
 const localUptime = ref(0)
-let localNextFarmRemainSec = 0
-let localNextFriendRemainSec = 0
 
-function updateCountdowns() {
-  // Update uptime
-  if (!status.value?.connection?.connected) {
-    nextFarmCheck.value = '账号未登录'
-    nextFriendCheck.value = '账号未登录'
-  }
-  else {
+function updateUptime() {
+  if (status.value?.connection?.connected) {
     localUptime.value++
-    if (localNextFarmRemainSec > 0) {
-      localNextFarmRemainSec--
-      nextFarmCheck.value = formatDuration(localNextFarmRemainSec)
-    }
-    else {
-      nextFarmCheck.value = '巡查中...'
-    }
-
-    if (localNextFriendRemainSec > 0) {
-      localNextFriendRemainSec--
-      nextFriendCheck.value = formatDuration(localNextFriendRemainSec)
-    }
-    else {
-      nextFriendCheck.value = '巡查中...'
-    }
   }
 }
 
 watch(status, (newVal) => {
-  if (newVal?.nextChecks) {
-    // Only update local counters if they are significantly different or 0
-    // Actually, we should sync from server periodically.
-    // Here we just take server value when it comes.
-    localNextFarmRemainSec = newVal.nextChecks.farmRemainSec || 0
-    localNextFriendRemainSec = newVal.nextChecks.friendRemainSec || 0
-    updateCountdowns() // Update immediately
-  }
   if (newVal?.uptime !== undefined) {
     localUptime.value = newVal.uptime
   }
@@ -386,20 +354,24 @@ function onLogScroll(e: Event) {
 }
 
 async function clearLogs() {
-  if (!currentAccountId.value) return
+  if (!currentAccountId.value)
+    return
   clearingLogs.value = true
   try {
     const { data } = await api.delete('/api/logs')
     if (data?.ok) {
       toastStore.success('日志已清空')
       await refresh(true)
-    } else {
+    }
+    else {
       toastStore.error(`清空失败: ${data?.error || '未知错误'}`)
     }
-  } catch (e: any) {
+  }
+  catch (e: any) {
     const msg = e?.response?.data?.error || e?.message || '请求失败'
     toastStore.error(`清空失败: ${msg}`)
-  } finally {
+  }
+  finally {
     clearingLogs.value = false
   }
 }
@@ -420,8 +392,8 @@ onMounted(() => {
 
 // Auto refresh fallback every 10s (WS 断开或筛选条件启用时会回退 HTTP)
 useIntervalFn(refresh, 10000)
-// Countdown timer (every 1s)
-useIntervalFn(updateCountdowns, 1000)
+// Uptime timer (every 1s)
+useIntervalFn(updateUptime, 1000)
 </script>
 
 <template>
@@ -647,34 +619,6 @@ useIntervalFn(updateCountdowns, 1000)
 
       <!-- Right Column Stack -->
       <div class="flex flex-col gap-6 md:w-1/4">
-        <!-- Next Checks -->
-        <div class="flex flex-col rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-          <h3 class="mb-4 flex items-center gap-2 text-lg font-medium">
-            <div class="i-carbon-hourglass" />
-            <span>下次巡查倒计时</span>
-          </h3>
-          <div class="flex flex-col justify-center gap-4">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <div class="i-carbon-sprout text-lg text-green-500" />
-                <span>农场</span>
-              </div>
-              <div class="text-lg font-bold font-mono">
-                {{ nextFarmCheck }}
-              </div>
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                <div class="i-carbon-user-multiple text-lg text-blue-500" />
-                <span>好友</span>
-              </div>
-              <div class="text-lg font-bold font-mono">
-                {{ nextFriendCheck }}
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- Operations Grid -->
         <div class="flex-1 rounded-lg bg-white p-4 shadow dark:bg-gray-800">
           <h3 class="mb-3 flex items-center gap-2 text-lg font-medium">

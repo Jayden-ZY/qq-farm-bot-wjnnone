@@ -39,7 +39,8 @@ export const useBagStore = defineStore('bag', () => {
       if (res.data.ok && res.data.data) {
         allItems.value = Array.isArray(res.data.data.items) ? res.data.data.items : []
         originalItems.value = Array.isArray(res.data.data.originalItems) ? res.data.data.originalItems : []
-      } else if (res.data && res.data.ok === false && res.data.error) {
+      }
+      else if (res.data && res.data.ok === false && res.data.error) {
         allItems.value = []
         originalItems.value = []
       }

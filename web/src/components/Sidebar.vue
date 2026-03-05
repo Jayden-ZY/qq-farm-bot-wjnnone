@@ -253,7 +253,7 @@ async function handleRenew() {
   if (!renewCardCode.value) {
     return
   }
-  
+
   try {
     const result = await userStore.renew(renewCardCode.value)
     if (result.ok) {
@@ -593,7 +593,7 @@ async function handleRenew() {
       </div>
       <div class="mt-6 flex justify-end space-x-3">
         <button
-          class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+          class="border border-gray-300 rounded-lg bg-white px-4 py-2 text-sm text-gray-700 transition-colors dark:border-gray-600 dark:bg-gray-700 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-600"
           @click="showRenewModal = false"
         >
           取消

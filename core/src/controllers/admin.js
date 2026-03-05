@@ -20,6 +20,7 @@ const { findAccountByRef, normalizeAccountRef, resolveAccountId } = require('../
 const { createModuleLogger } = require('../services/logger');
 const { MiniProgramLoginSession } = require('../services/qrlogin');
 const { getSchedulerRegistrySnapshot } = require('../services/scheduler');
+const { OauthService } = require('../services/oauth');
 const userStore = require('../models/user-store');
 
 const hashPassword = (pwd) => crypto.createHash('sha256').update(String(pwd || '')).digest('hex');
@@ -277,6 +278,116 @@ function startAdminServer(dataProvider) {
         res.json({ ok: true, data: result.user });
     });
 
+    // OAuth 登录接口 - 获取登录跳转URL
+    app.post('/api/oauth/login', async (req, res) => {
+        const { type } = req.body || {};
+        if (!type) {
+            return res.status(400).json({ ok: false, error: '请提供登录类型' });
+        }
+
+        const oauthConfig = store.getOAuthConfig();
+        
+        if (!oauthConfig.enabled) {
+            return res.status(400).json({ ok: false, error: 'OAuth登录未启用' });
+        }
+
+        const apiUrl = oauthConfig.apiUrl;
+        const appId = oauthConfig.appId;
+        const appKey = oauthConfig.appKey;
+        
+        if (!apiUrl || !appId || !appKey) {
+            return res.status(500).json({ ok: false, error: 'OAuth配置不完整，请联系管理员' });
+        }
+
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const callbackUrl = `${protocol}://${host}/api/oauth/callback`;
+
+        const oauth = new OauthService(apiUrl, appId, appKey, callbackUrl);
+        const result = await oauth.login(type);
+
+        if (result.code === 0 && result.url) {
+            res.json({ ok: true, data: { url: result.url } });
+        } else {
+            res.status(400).json({ ok: false, error: result.msg || '获取登录链接失败' });
+        }
+    });
+
+    // OAuth 回调接口
+    app.get('/api/oauth/callback', async (req, res) => {
+        const { code, type } = req.query;
+
+        if (!code || !type) {
+            return res.redirect('/login?error=invalid_callback');
+        }
+
+        const oauthConfig = store.getOAuthConfig();
+        const apiUrl = oauthConfig.apiUrl;
+        const appId = oauthConfig.appId;
+        const appKey = oauthConfig.appKey;
+        
+        if (!apiUrl || !appId || !appKey) {
+            return res.redirect('/login?error=oauth_config_error');
+        }
+
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const callbackUrl = `${protocol}://${host}/api/oauth/callback`;
+
+        const oauth = new OauthService(apiUrl, appId, appKey, callbackUrl);
+        const result = await oauth.callback(code);
+
+        if (result.code === 0 && result.social_uid) {
+            const { social_uid, nickname, faceimg } = result;
+            
+            const { user, isNew } = userStore.findOrCreateOAuthUser(type, social_uid, nickname, faceimg);
+            
+            const token = issueToken();
+            tokens.add(token);
+            tokenUserMap.set(token, user);
+            
+            adminLogger.info('oauth login success', { 
+                type, 
+                social_uid, 
+                username: user.username, 
+                isNew 
+            });
+
+            const redirectUrl = `/login?oauth_token=${token}&oauth_user=${encodeURIComponent(JSON.stringify({
+                username: user.username,
+                role: user.role,
+                card: user.card
+            }))}`;
+            res.redirect(redirectUrl);
+        } else {
+            res.redirect(`/login?error=${encodeURIComponent(result.msg || '登录失败')}`);
+        }
+    });
+
+    // OAuth Token 登录接口
+    app.post('/api/oauth/token-login', (req, res) => {
+        const { token } = req.body || {};
+        
+        if (!token || !tokens.has(token)) {
+            return res.status(401).json({ ok: false, error: '无效的登录凭证' });
+        }
+
+        const user = tokenUserMap.get(token);
+        if (!user) {
+            return res.status(401).json({ ok: false, error: '用户信息不存在' });
+        }
+
+        res.json({ 
+            ok: true, 
+            data: { 
+                token, 
+                role: user.role, 
+                card: user.card, 
+                user: { username: user.username } 
+            } 
+        });
+    });
+
     // 用户续费接口
     app.post('/api/user/renew', checkUserAccess, (req, res) => {
         const { cardCode } = req.body || {};
@@ -326,7 +437,7 @@ function startAdminServer(dataProvider) {
     });
 
     app.use('/api', (req, res, next) => {
-        if (req.path === '/login' || req.path === '/qr/create' || req.path === '/qr/check' || req.path === '/proxy') return next();
+        if (req.path === '/login' || req.path === '/qr/create' || req.path === '/qr/check' || req.path === '/proxy' || req.path === '/oauth/login' || req.path === '/oauth/callback' || req.path === '/admin/oauth') return next();
         return authRequired(req, res, next);
     });
 
@@ -1222,6 +1333,80 @@ function startAdminServer(dataProvider) {
                     card: user.card
                 }
             });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // ============ OAuth 配置 API（仅管理员） ============
+    // 获取OAuth配置（公开，用于登录页判断是否显示QQ登录）
+    app.get('/api/admin/oauth', (req, res) => {
+        try {
+            const config = store.getOAuthConfig();
+            res.json({ ok: true, data: config });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 更新OAuth配置（仅管理员）
+    app.post('/api/admin/oauth', authRequired, adminRequired, (req, res) => {
+        try {
+            const { enabled, apiUrl, appId, appKey } = req.body || {};
+            const config = store.setOAuthConfig({
+                enabled: !!enabled,
+                apiUrl: String(apiUrl || '').trim(),
+                appId: String(appId || '').trim(),
+                appKey: String(appKey || '').trim(),
+            });
+            res.json({ ok: true, data: config });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 获取OAuth用户默认配置（仅管理员）
+    app.get('/api/admin/oauth-user-default', authRequired, adminRequired, (req, res) => {
+        try {
+            const config = store.getOAuthUserDefault();
+            res.json({ ok: true, data: config });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 更新OAuth用户默认配置（仅管理员）
+    app.post('/api/admin/oauth-user-default', authRequired, adminRequired, (req, res) => {
+        try {
+            const { days, quota } = req.body || {};
+            const config = store.setOAuthUserDefault({
+                days: Number.parseInt(days, 10),
+                quota: Number.parseInt(quota, 10),
+            });
+            res.json({ ok: true, data: config });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 获取卡密注册默认配置（仅管理员）
+    app.get('/api/admin/card-register-default', authRequired, adminRequired, (req, res) => {
+        try {
+            const config = store.getCardRegisterDefault();
+            res.json({ ok: true, data: config });
+        } catch (e) {
+            res.status(500).json({ ok: false, error: e.message });
+        }
+    });
+
+    // 更新卡密注册默认配置（仅管理员）
+    app.post('/api/admin/card-register-default', authRequired, adminRequired, (req, res) => {
+        try {
+            const { quota } = req.body || {};
+            const config = store.setCardRegisterDefault({
+                quota: Number.parseInt(quota, 10),
+            });
+            res.json({ ok: true, data: config });
         } catch (e) {
             res.status(500).json({ ok: false, error: e.message });
         }

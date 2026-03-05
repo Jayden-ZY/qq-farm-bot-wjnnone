@@ -186,7 +186,8 @@ async function handleRemoveFromBlacklist(gid: number) {
 }
 
 async function handleBatchOp(opType: 'help' | 'steal' | 'bad') {
-  if (!currentAccountId.value || batchLoading.value) return
+  if (!currentAccountId.value || batchLoading.value)
+    return
 
   const opNames: Record<string, string> = {
     help: '一键帮助',
@@ -201,12 +202,15 @@ async function handleBatchOp(opType: 'help' | 'steal' | 'bad') {
       if (res.ok) {
         toast.success(`${opNames[opType]}完成`)
         await friendStore.fetchFriends(currentAccountId.value!)
-      } else {
+      }
+      else {
         toast.error(res.error || `${opNames[opType]}失败`)
       }
-    } catch (e: any) {
+    }
+    catch (e: any) {
       toast.error(e?.message || `${opNames[opType]}失败`)
-    } finally {
+    }
+    finally {
       batchLoading.value = false
     }
   }
@@ -273,7 +277,7 @@ async function handleBatchOp(opType: 'help' | 'steal' | 'bad') {
       <div class="flex flex-wrap gap-2 rounded-lg bg-white p-3 shadow dark:bg-gray-800">
         <span class="flex items-center text-sm text-gray-500 dark:text-gray-400">批量操作：</span>
         <button
-          class="rounded bg-green-100 px-3 py-1.5 text-sm text-green-700 transition hover:bg-green-200 disabled:opacity-50 dark:bg-green-900/30 dark:text-green-400 dark:hover:bg-green-900/50"
+          class="rounded bg-green-100 px-3 py-1.5 text-sm text-green-700 transition dark:bg-green-900/30 hover:bg-green-200 dark:text-green-400 disabled:opacity-50 dark:hover:bg-green-900/50"
           :disabled="batchLoading"
           @click="handleBatchOp('help')"
         >
@@ -281,7 +285,7 @@ async function handleBatchOp(opType: 'help' | 'steal' | 'bad') {
           一键帮助
         </button>
         <button
-          class="rounded bg-blue-100 px-3 py-1.5 text-sm text-blue-700 transition hover:bg-blue-200 disabled:opacity-50 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50"
+          class="rounded bg-blue-100 px-3 py-1.5 text-sm text-blue-700 transition dark:bg-blue-900/30 hover:bg-blue-200 dark:text-blue-400 disabled:opacity-50 dark:hover:bg-blue-900/50"
           :disabled="batchLoading"
           @click="handleBatchOp('steal')"
         >
@@ -289,7 +293,7 @@ async function handleBatchOp(opType: 'help' | 'steal' | 'bad') {
           一键偷取
         </button>
         <button
-          class="rounded bg-red-100 px-3 py-1.5 text-sm text-red-700 transition hover:bg-red-200 disabled:opacity-50 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50"
+          class="rounded bg-red-100 px-3 py-1.5 text-sm text-red-700 transition dark:bg-red-900/30 hover:bg-red-200 dark:text-red-400 disabled:opacity-50 dark:hover:bg-red-900/50"
           :disabled="batchLoading"
           @click="handleBatchOp('bad')"
         >

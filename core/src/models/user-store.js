@@ -1,6 +1,7 @@
 const fs = require('fs');
 const { getDataFile, ensureDataDir } = require('../config/runtime-paths');
 const crypto = require('crypto');
+const { getOAuthUserDefault, getCardRegisterDefault } = require('./store');
 
 const USERS_FILE = getDataFile('users.json');
 const CARDS_FILE = getDataFile('cards.json');
@@ -138,6 +139,9 @@ function registerUser(username, password, cardCode) {
         expiresAt = now + card.days * 24 * 60 * 60 * 1000;
     }
 
+    const registerDefaults = getCardRegisterDefault();
+    const defaultQuota = registerDefaults.quota || 3;
+
     const newUser = {
         username,
         password: hashPassword(password),
@@ -149,7 +153,7 @@ function registerUser(username, password, cardCode) {
             description: card.description,
             type: 'days',
             days: card.days,
-            quota: 3,
+            quota: defaultQuota,
             expiresAt,
             enabled: true
         },
@@ -469,6 +473,79 @@ function getWxLoginConfig(username) {
     return { ok: true, config: user.wxLoginConfig || null };
 }
 
+function findOrCreateOAuthUser(type, openid, nickname, faceimg) {
+    loadUsers();
+    
+    const oauthId = `${type}_${openid}`;
+    const user = users.find(u => u.oauthId === oauthId);
+    
+    if (user) {
+        if (nickname && user.nickname !== nickname) {
+            user.nickname = nickname;
+            saveUsers();
+        }
+        if (faceimg && user.faceimg !== faceimg) {
+            user.faceimg = faceimg;
+            saveUsers();
+        }
+        return { 
+            user: {
+                username: user.username,
+                role: user.role,
+                cardCode: user.cardCode || null,
+                card: user.card || null
+            },
+            isNew: false 
+        };
+    }
+    
+    const username = `${type}_${openid.substring(0, 8)}`;
+    const now = Date.now();
+    
+    const oauthDefaults = getOAuthUserDefault();
+    const defaultDays = oauthDefaults.days || 30;
+    const defaultQuota = oauthDefaults.quota || 0;
+    
+    let expiresAt = null;
+    if (defaultDays > 0) {
+        expiresAt = now + defaultDays * 24 * 60 * 60 * 1000;
+    }
+    
+    const newUser = {
+        username,
+        password: null,
+        plainPassword: null,
+        role: 'user',
+        oauthId,
+        oauthType: type,
+        openid,
+        nickname,
+        faceimg,
+        card: {
+            code: null,
+            description: 'OAuth用户默认卡密',
+            type: 'days',
+            days: defaultDays,
+            quota: defaultQuota,
+            expiresAt,
+            enabled: true
+        },
+        createdAt: now
+    };
+    
+    users.push(newUser);
+    saveUsers();
+    
+    return { 
+        user: {
+            username: newUser.username,
+            role: newUser.role,
+            card: newUser.card
+        },
+        isNew: true 
+    };
+}
+
 initDefaultAdmin();
 
 module.exports = {
@@ -487,5 +564,6 @@ module.exports = {
     deleteUser,
     changePassword,
     saveWxLoginConfig,
-    getWxLoginConfig
+    getWxLoginConfig,
+    findOrCreateOAuthUser
 };

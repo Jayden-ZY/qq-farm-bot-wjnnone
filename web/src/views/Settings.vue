@@ -504,8 +504,10 @@ async function handleTestOffline() {
             </div>
           </div>
 
-          <div class="mt-4 space-y-3 border-t pt-3 dark:border-gray-700">
-            <h4 class="text-sm text-gray-700 font-medium dark:text-gray-300">种植与偷菜延迟设置</h4>
+          <div class="mt-4 border-t pt-3 space-y-3 dark:border-gray-700">
+            <h4 class="text-sm text-gray-700 font-medium dark:text-gray-300">
+              种植与偷菜延迟设置
+            </h4>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-3">
               <BaseSwitch
                 v-model="localSettings.plantOrderRandom"
@@ -690,8 +692,8 @@ async function handleTestOffline() {
               v-model.number="localOffline.offlineDeleteSec"
               label="离线删除账号 (秒)"
               type="number"
-              min="1"
-              placeholder="默认 120"
+              min="0"
+              placeholder="默认 0 (不删除)"
             />
           </div>
 

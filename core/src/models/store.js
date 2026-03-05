@@ -95,12 +95,25 @@ const globalConfig = {
     // 用户隔离的下线提醒配置: { [username]: config }
     userOfflineReminders: {},
     adminPasswordHash: '',
+    oauth: {
+        enabled: false,
+        apiUrl: '',
+        appId: '',
+        appKey: '',
+    },
+    oauthUserDefault: {
+        days: 30,
+        quota: 0,
+    },
+    cardRegisterDefault: {
+        quota: 3,
+    },
 };
 
 function normalizeOfflineReminder(input) {
     const src = (input && typeof input === 'object') ? input : {};
     let offlineDeleteSec = Number.parseInt(src.offlineDeleteSec, 10);
-    if (!Number.isFinite(offlineDeleteSec) || offlineDeleteSec < 1) {
+    if (!Number.isFinite(offlineDeleteSec) || offlineDeleteSec < 0) {
         offlineDeleteSec = DEFAULT_OFFLINE_REMINDER.offlineDeleteSec;
     }
     const rawChannel = (src.channel !== undefined && src.channel !== null)
@@ -345,6 +358,31 @@ function loadGlobalConfig() {
 
             if (typeof data.adminPasswordHash === 'string') {
                 globalConfig.adminPasswordHash = data.adminPasswordHash;
+            }
+
+            if (data.oauth && typeof data.oauth === 'object') {
+                globalConfig.oauth = {
+                    enabled: !!data.oauth.enabled,
+                    apiUrl: String(data.oauth.apiUrl || '').trim(),
+                    appId: String(data.oauth.appId || '').trim(),
+                    appKey: String(data.oauth.appKey || '').trim(),
+                };
+            }
+
+            if (data.oauthUserDefault && typeof data.oauthUserDefault === 'object') {
+                const days = Number.parseInt(data.oauthUserDefault.days, 10);
+                const quota = Number.parseInt(data.oauthUserDefault.quota, 10);
+                globalConfig.oauthUserDefault = {
+                    days: Math.max(0, Number.isFinite(days) ? days : 30),
+                    quota: Math.max(0, Number.isFinite(quota) ? quota : 0),
+                };
+            }
+
+            if (data.cardRegisterDefault && typeof data.cardRegisterDefault === 'object') {
+                const quota = Number.parseInt(data.cardRegisterDefault.quota, 10);
+                globalConfig.cardRegisterDefault = {
+                    quota: Number.isFinite(quota) && quota >= 0 ? quota : 3,
+                };
             }
         }
     } catch (e) {
@@ -771,6 +809,55 @@ function deleteUserConfig(username) {
     deleteUserOfflineReminder(username);
 }
 
+function getOAuthConfig() {
+    return { ...globalConfig.oauth };
+}
+
+function setOAuthConfig(cfg) {
+    if (cfg && typeof cfg === 'object') {
+        globalConfig.oauth = {
+            enabled: !!cfg.enabled,
+            apiUrl: String(cfg.apiUrl || '').trim(),
+            appId: String(cfg.appId || '').trim(),
+            appKey: String(cfg.appKey || '').trim(),
+        };
+        saveGlobalConfig();
+    }
+    return getOAuthConfig();
+}
+
+function getOAuthUserDefault() {
+    return { ...globalConfig.oauthUserDefault };
+}
+
+function setOAuthUserDefault(cfg) {
+    if (cfg && typeof cfg === 'object') {
+        const days = Number.parseInt(cfg.days, 10);
+        const quota = Number.parseInt(cfg.quota, 10);
+        globalConfig.oauthUserDefault = {
+            days: Math.max(0, Number.isFinite(days) ? days : 30),
+            quota: Math.max(0, Number.isFinite(quota) ? quota : 0),
+        };
+        saveGlobalConfig();
+    }
+    return getOAuthUserDefault();
+}
+
+function getCardRegisterDefault() {
+    return { ...globalConfig.cardRegisterDefault };
+}
+
+function setCardRegisterDefault(cfg) {
+    if (cfg && typeof cfg === 'object') {
+        const quota = Number.parseInt(cfg.quota, 10);
+        globalConfig.cardRegisterDefault = {
+            quota: Number.isFinite(quota) && quota >= 0 ? quota : 3,
+        };
+        saveGlobalConfig();
+    }
+    return getCardRegisterDefault();
+}
+
 module.exports = {
     getConfigSnapshot,
     applyConfigSnapshot,
@@ -803,4 +890,13 @@ module.exports = {
     // 蔬菜黑名单
     getPlantBlacklist,
     setPlantBlacklist,
+    // OAuth配置
+    getOAuthConfig,
+    setOAuthConfig,
+    // OAuth用户默认配置
+    getOAuthUserDefault,
+    setOAuthUserDefault,
+    // 卡密注册默认配置
+    getCardRegisterDefault,
+    setCardRegisterDefault,
 };
