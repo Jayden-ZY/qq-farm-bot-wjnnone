@@ -999,10 +999,10 @@ async function visitFriendForSteal(friend, totalActions, myGid, accountId) {
 
 // ============ 仅帮助 ============
 
-async function visitFriendForHelp(friend, totalActions, myGid, accountId) {
+async function visitFriendForHelp(friend, totalActions, myGid, accountId, ignoreExpLimit = false) {
     const { gid, name } = friend;
 
-    const stopWhenExpLimit = !!isAutomationOn('friend_help_exp_limit');
+    const stopWhenExpLimit = !!isAutomationOn('friend_help_exp_limit') && !ignoreExpLimit;
     if (!stopWhenExpLimit) canGetHelpExp = true;
     if (stopWhenExpLimit && !canGetHelpExp) {
         return;
@@ -1094,6 +1094,7 @@ async function checkFriends(options = {}) {
     const onlyHelp = options.onlyHelp || false;
     const onlySteal = options.onlySteal || false;
     const onlyBad = options.onlyBad || false;
+    const ignoreExpLimit = options.ignoreExpLimit || false;
     
     const effectiveHelpEnabled = onlyHelp ? true : (onlySteal || onlyBad ? false : helpEnabled);
     const effectiveStealEnabled = onlySteal ? true : (onlyHelp || onlyBad ? false : stealEnabled);
@@ -1190,14 +1191,14 @@ async function checkFriends(options = {}) {
                 log('好友', `批量帮助第 ${i + 1}/${helpFriends.length} 个好友: ${friend.name}`, { module: 'friend', event: '批量帮助开始', index: i + 1, total: helpFriends.length, friendName: friend.name });
 
                 // 检查是否还能获得帮助经验
-                const stopWhenExpLimit = !!isAutomationOn('friend_help_exp_limit');
+                const stopWhenExpLimit = !!isAutomationOn('friend_help_exp_limit') && !ignoreExpLimit;
                 if (stopWhenExpLimit && !canGetHelpExp) {
                     log('好友', `批量帮助中断：经验已达上限`, { module: 'friend', event: '批量帮助中断', reason: 'exp_limit' });
                     break;
                 }
 
                 try {
-                    await visitFriendForHelp(friend, totalActions, state.gid, state.accountId);
+                    await visitFriendForHelp(friend, totalActions, state.gid, state.accountId, ignoreExpLimit);
                     log('好友', `批量帮助第 ${i + 1} 个好友完成: ${friend.name}`, { module: 'friend', event: '批量帮助完成', index: i + 1, friendName: friend.name });
                 } catch (e) {
                     log('好友', `批量帮助第 ${i + 1} 个好友失败: ${friend.name}, 错误: ${e.message}`, { module: 'friend', event: '批量帮助失败', index: i + 1, friendName: friend.name, error: e.message });
@@ -1258,6 +1259,7 @@ async function doBatchFriendOp(opType) {
             const result = await checkFriends({
                 onlyHelp: opType === 'help',
                 onlySteal: opType === 'steal',
+                ignoreExpLimit: opType === 'help',
             });
             return { ok: true, result };
         }

@@ -162,18 +162,56 @@ function getOrganicFertilizerTargetsFromLands(lands) {
     return targets;
 }
 
-async function runFertilizerByConfig(plantedLands = []) {
+function getFastMatureLands(lands) {
+    const list = Array.isArray(lands) ? lands : [];
+    const targets = [];
+    const nowSec = getServerTimeSec();
+    const FIVE_MINUTES_SEC = 5 * 60;
+
+    for (const land of list) {
+        if (!land || !land.unlocked) continue;
+        const landId = toNum(land.id);
+        if (!landId) continue;
+
+        const plant = land.plant;
+        if (!plant || !plant.phases || plant.phases.length === 0) continue;
+        const currentPhase = getCurrentPhase(plant.phases);
+        if (!currentPhase) continue;
+        if (currentPhase.phase === PlantPhase.DEAD) continue;
+        if (currentPhase.phase === PlantPhase.MATURE) continue;
+
+        const maturePhase = plant.phases.find(p => toNum(p.phase) === PlantPhase.MATURE);
+        if (!maturePhase) continue;
+
+        const matureBeginTime = toTimeSec(maturePhase.begin_time);
+        if (matureBeginTime <= 0) continue;
+
+        const timeToMature = matureBeginTime - nowSec;
+
+        if (timeToMature <= FIVE_MINUTES_SEC && timeToMature >= 0) {
+            if (Object.prototype.hasOwnProperty.call(plant, 'left_inorc_fert_times')) {
+                const leftTimes = toNum(plant.left_inorc_fert_times);
+                if (leftTimes <= 0) continue;
+            }
+            targets.push(landId);
+        }
+    }
+    return targets;
+}
+
+async function runFertilizerByConfig(plantedLands = [], options = {}) {
     const fertilizerConfig = getAutomation().fertilizer || 'both';
     const planted = (Array.isArray(plantedLands) ? plantedLands : []).filter(Boolean);
+    const { skipNormal = false } = options;
 
-    if (planted.length === 0 && fertilizerConfig !== 'organic' && fertilizerConfig !== 'both') {
+    if (planted.length === 0 && fertilizerConfig !== 'organic' && fertilizerConfig !== 'both' && fertilizerConfig !== 'smart') {
         return { normal: 0, organic: 0 };
     }
 
     let fertilizedNormal = 0;
     let fertilizedOrganic = 0;
 
-    if ((fertilizerConfig === 'normal' || fertilizerConfig === 'both') && planted.length > 0) {
+    if (!skipNormal && (fertilizerConfig === 'normal' || fertilizerConfig === 'both' || fertilizerConfig === 'smart') && planted.length > 0) {
         fertilizedNormal = await fertilize(planted, NORMAL_FERTILIZER_ID);
         if (fertilizedNormal > 0) {
             log('施肥', `已为 ${fertilizedNormal}/${planted.length} 块地施无机化肥`, {
@@ -206,6 +244,29 @@ async function runFertilizerByConfig(plantedLands = []) {
                 count: fertilizedOrganic,
             });
             recordOperation('fertilize', fertilizedOrganic);
+        }
+    }
+    else if (fertilizerConfig === 'smart') {
+        let organicTargets = [];
+        try {
+            const latest = await getAllLands();
+            organicTargets = getFastMatureLands(latest && latest.lands);
+        } catch (e) {
+            logWarn('施肥', `获取全农场地块失败: ${e.message}`);
+        }
+
+        if (organicTargets.length > 0) {
+            fertilizedOrganic = await fertilizeOrganicLoop(organicTargets);
+            if (fertilizedOrganic > 0) {
+                log('施肥', `有机化肥循环施肥完成，共施 ${fertilizedOrganic} 次`, {
+                    module: 'farm',
+                    event: '施肥',
+                    result: 'ok',
+                    type: 'organic',
+                    count: fertilizedOrganic,
+                });
+                recordOperation('fertilize', fertilizedOrganic);
+            }
         }
     }
 
@@ -1045,6 +1106,20 @@ async function runFarmOperation(opType) {
             if (upgraded > 0) {
                 actions.push(`升级${upgraded}`);
                 recordOperation('upgrade', upgraded);
+            }
+        }
+    }
+
+    if (opType === 'all') {
+        const fertilizerConfig = getAutomation().fertilizer || 'none';
+        if (fertilizerConfig === 'smart') {
+            try {
+                const result = await runFertilizerByConfig([], { skipNormal: true });
+                if (result.organic > 0) {
+                    actions.push(`有机肥${result.organic}`);
+                }
+            } catch (e) {
+                logWarn('施肥', `巡田时施肥失败: ${e.message}`);
             }
         }
     }

@@ -262,7 +262,6 @@ async function runHelpTick(auto) {
         CONFIG.helpCheckIntervalMin || 10000,
         CONFIG.helpCheckIntervalMax || 10000
     );
-    log('系统', `帮助巡查开始执行，下次间隔 ${helpMs}ms`, { module: 'system', event: '帮助巡查', result: 'start', intervalMs: helpMs });
     try {
         await checkFriends({ onlyHelp: true });
     } catch (e) {
@@ -270,7 +269,6 @@ async function runHelpTick(auto) {
     } finally {
         nextHelpRunAt = Date.now() + helpMs;
         helpTaskRunning = false;
-        log('系统', `帮助巡查执行完成，下次执行时间: ${new Date(nextHelpRunAt).toISOString()}`, { module: 'system', event: '帮助巡查', result: 'done', nextRunAt: nextHelpRunAt });
     }
 }
 
@@ -388,12 +386,11 @@ function applyRuntimeConfig(snapshot, syncNow = false) {
             const prevFertilizerMode = String(prevAuto && prevAuto.fertilizer ? prevAuto.fertilizer : '').toLowerCase();
             const nextFertilizerMode = String(nextAuto && nextAuto.fertilizer ? nextAuto.fertilizer : '').toLowerCase();
             const fertilizerChanged = prevFertilizerMode !== nextFertilizerMode;
-            if (fertilizerChanged && (nextFertilizerMode === 'both' || nextFertilizerMode === 'organic')) {
-                // 保存设置时 /api/automation 可能连续触发多次 config_sync，这里做防抖为一次立即施肥
+            if (fertilizerChanged && (nextFertilizerMode === 'both' || nextFertilizerMode === 'organic' || nextFertilizerMode === 'smart')) {
                 workerScheduler.setTimeoutTask('fertilizer_immediate_after_save', 600, async () => {
                     if (!loginReady) return;
                     try {
-                        await runFertilizerByConfig([]);
+                        await runFertilizerByConfig([], { skipNormal: true });
                     } catch (e) {
                         log('施肥', `保存配置后立即施肥失败: ${e.message}`, {
                             module: 'farm',

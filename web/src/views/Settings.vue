@@ -168,6 +168,7 @@ watch(currentAccountId, () => {
 
 const fertilizerOptions = [
   { label: '普通 + 有机', value: 'both' },
+  { label: '普通 + 快成熟有机', value: 'smart' },
   { label: '仅普通化肥', value: 'normal' },
   { label: '仅有机化肥', value: 'organic' },
   { label: '不施肥', value: 'none' },
